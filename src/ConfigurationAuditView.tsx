@@ -185,12 +185,38 @@ const getDeltaType = (delta: any, movedFrom: any) => {
         return 'node';
     }
 
-    return "unknown";
+    return "unchanged";
 }
 
-const JSONDeltaComponent: React.SFC<{ json: object, delta: Delta | undefined }> = (props) => {
+/*
+const HighlightedJSON = ({ json }: Object) => {
+    const highlightedJSON = jsonObj =>
+        Object.keys(jsonObj).map(key => {
+            const value = jsonObj[key];
+            let valueType = typeof value;
+            const isSimpleValue =
+                ["string", "number", "boolean"].includes(valueType) || !value;
+            if (isSimpleValue && valueType === "object") {
+                valueType = "null";
+            }
+            return (
+                <div key={key} className="line">
+                    <span className="key">{key}:</span>
+                    {isSimpleValue ? (
+                        <span className={valueType}>{`${value}`}</span>
+                    ) : (
+                        highlightedJSON(value)
+                    )}
+                </div>
+            );
+        });
 
-    const { json, delta } = props;
+    return <div className="json">{highlightedJSON(json)}</div>;
+};*/
+
+const JSONDeltaComponent: React.SFC<{ json: object, delta: Delta | undefined, showUnchangedValues: boolean }> = (props) => {
+
+    const { json, delta, showUnchangedValues } = props;
 
     let keys: string[] = Object.keys(json);
     let deltaKeys: string[];
@@ -255,9 +281,8 @@ const JSONDeltaComponent: React.SFC<{ json: object, delta: Delta | undefined }> 
 
         if (movedFrom) {
             currentValue = movedFrom.fromValue;
-            // console.log(`${key} = ${movedFrom.desc}`);
         } else {
-
+            currentValue = json[key];
         }
 
         const valueType: any = Array.isArray(currentValue) ? "array" : typeof currentValue;
@@ -285,30 +310,45 @@ const JSONDeltaComponent: React.SFC<{ json: object, delta: Delta | undefined }> 
         else if (currentDeltaType === "textdiff") {
 
             deltaRenderer = <TextDiff name={key} delta={currentDelta} />
-
         }
-        else if (currentDelta === "node") {
+        else if (currentDeltaType === "node") {
             deltaRenderer = <>
-                <Name>Required Node {key}</Name>
-                <JSONDeltaComponent json={currentValue} delta={currentDelta} />
+                <Name>{key}</Name>
+                <JSONDeltaComponent json={currentValue} delta={currentDelta} showUnchangedValues={showUnchangedValues} />
             </>
         }
-        else {
+        else if (currentDeltaType === "movedestination") {
+            deltaRenderer = <>
+                <Name>{key}</Name>
+                <i>Moved</i>
+            </>
+        }
+        else if (currentDeltaType === "unchanged") {
 
-            if (isSimpleValue) {
-                deltaRenderer = <span>
-                    <Name>{key}</Name>
-                    {`${currentValue}`}
-                </span>;
-            } else {
-                deltaRenderer = <>
-                    <Name>{key}</Name>
-                    <JSONDeltaComponent json={currentValue} delta={currentDelta} />
-                </>
+            if (showUnchangedValues) {
+                if (isSimpleValue) {
+                    deltaRenderer = <span className="line">
+                        <Name>{key}</Name>
+                        {`${currentValue}`}
+                    </span>;
+                } else {
+                    // TODO: Replace this with a simple recurive renderer
+                    deltaRenderer = <>
+                        <Name>{key}</Name>
+                        <JSONDeltaComponent json={currentValue} delta={currentDelta} showUnchangedValues={showUnchangedValues} />
+                    </>
+                }
             }
         }
 
-        return (
+        /*
+        else {
+
+
+        }
+        */
+
+        return deltaRenderer && (
             <div key={key} className="line">
                 {deltaRenderer}
             </div>
@@ -590,7 +630,13 @@ class ConfigurationAuditView extends React.Component<OwnProps, {}>{
         return (
             <div style={{display: "flex", flex: 1, flexDirection: "row"}}>
                 <pre style={{flex: 1}}>{delta && JSON.stringify(delta, null, 2)}</pre>
-                <StyledHighlightedJSON><JSONDeltaComponent delta={delta} json={before} /></StyledHighlightedJSON>
+                <StyledHighlightedJSON>
+                    <JSONDeltaComponent
+                        delta={delta}
+                        json={before}
+                        showUnchangedValues={true}
+                    />
+                </StyledHighlightedJSON>
             </div>
         );
     }
