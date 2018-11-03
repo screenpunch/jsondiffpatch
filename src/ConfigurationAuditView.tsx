@@ -223,21 +223,7 @@ const HighlightedJSON = (props: { json: object, delta: any }) => {
                     }
                 }
             });
-
-            /*
-            if (hasMoveDestinations) {
-                console.log(moveDestinations);
-            }*/
         }
-
-        /*
-        deltaKeys && deltaKeys.filter(
-            (name) => {
-                const value = deltaObj[name];
-                return isArray(value) && value[2] === 3;
-            })
-            .forEach();*/
-
 
         return keys && keys.map(key => {
 
@@ -246,6 +232,11 @@ const HighlightedJSON = (props: { json: object, delta: any }) => {
             let currentValue = jsonObj[key];
             const currentDelta = deltaObj && deltaObj[key];
             const currentDeltaType = getDeltaType(currentDelta, movedFrom);
+
+
+            if (currentDeltaType === "unchanged") {
+                return null;
+            }
 
             if (movedFrom) {
                 currentValue = movedFrom.value;
@@ -281,7 +272,7 @@ const HighlightedJSON = (props: { json: object, delta: any }) => {
             }
             else if (currentDelta === "node") {
                 deltaRenderer = <>
-                    <Name>{key}</Name>
+                    <Name>Required Node {key}</Name>
                     {highlightedJSON(currentValue, currentDelta)}
                 </>
             }
@@ -302,7 +293,7 @@ const HighlightedJSON = (props: { json: object, delta: any }) => {
 
             {/*
             <span className="key">{key} |</span>
-            <span><i>{currentDeltaType}</i> |</span>
+
             */}
             return (
                 <div key={key} className="line">
@@ -312,7 +303,7 @@ const HighlightedJSON = (props: { json: object, delta: any }) => {
             );
         })};
 
-    return <div className="json">{highlightedJSON(json, delta)}</div>;
+    return <div>{highlightedJSON(json, delta)}</div>;
 };
 
 const StyledHighlightedJSON = styled.div`
@@ -327,6 +318,7 @@ const StyledHighlightedJSON = styled.div`
   .line {
     margin-left: 1rem;
   }
+  /*
   .key {
     margin-right: 0.5rem;
     color: black;
@@ -344,6 +336,7 @@ const StyledHighlightedJSON = styled.div`
   .null {
     color: red;
   }
+  */
 `
 
 class ConfigurationAuditView extends React.Component<OwnProps, {}>{
