@@ -30,12 +30,13 @@ const arrayKeyToSortNumber = (key: string) => {
 const isArray = typeof Array.isArray === 'function' ? Array.isArray : (a: any) => a instanceof Array;
 
 // From BaseFormatter
-const arrayKeyComparer = (key1: any, key2: any) => arrayKeyToSortNumber(key1) - arrayKeyToSortNumber(key2);
+const arrayKeyCompare = (key1: any, key2: any) => arrayKeyToSortNumber(key1) - arrayKeyToSortNumber(key2);
 
 const Name = styled.span`
   margin-right: 0.5rem;
   color: black;
   font-weight: 600;
+  text-transform: capitalize;
   ::after {
     content: ":";
   }
@@ -87,8 +88,6 @@ const Removed = (props: DeltaRendererProps) => {
 const Moved = (props: DeltaRendererProps) => {
     const { delta, name } = props;
 
-    console.log(delta);
-
     let value = delta && delta[1];
 
     // TODO: Simple Recurse without delta checking
@@ -133,9 +132,23 @@ const Modified = (props: DeltaRendererProps) => {
     </span>);
 }
 
-const TextDiff = (props: {id: string, delta: any[]}) => {
-    const value = props.delta && props.delta[0] && JSON.stringify(props.delta[0]);
-    return <span style={{display: "block", backgroundColor: '#cccccc'}}>{props.id}: => {value}</span>
+const TextDiff = (props: DeltaRendererProps) => {
+    const { delta, name } = props;
+    let value = delta && delta[0];
+
+    // TODO: Simple Recurse without delta checking
+    if (typeof value === "object") {
+        value = JSON.stringify(value);
+    }
+
+    return (
+        <>
+            <Name>{name}</Name>
+            <span style={{backgroundColor: '#cccccc'}}>
+                {value}
+            </span>
+        </>
+    );
 }
 
 
@@ -165,6 +178,7 @@ const getDeltaType = (delta: any, movedFrom: any) => {
         if (delta.length === 3 && delta[2] === 3) {
             return 'moved';
         }
+
     } else if (typeof delta === 'object') {
 
         // delta being an object indicates that that there are children with deltas
@@ -174,136 +188,134 @@ const getDeltaType = (delta: any, movedFrom: any) => {
     return "unknown";
 }
 
-const HighlightedJSON = (props: { json: object, delta: any }) => {
+const JSONDeltaComponent: React.SFC<{ json: object, delta: Delta | undefined }> = (props) => {
 
-    const { delta, json } = props;
+    const { json, delta } = props;
 
-    const highlightedJSON = (jsonObj: any, deltaObj: any) => {
+    let keys: string[] = Object.keys(json);
+    let deltaKeys: string[];
+    let moveDestinations: { [toIndex: string]: { fromIndex: string, fromValue: any }; };
 
-        const jsonKeys = Object.keys(jsonObj);
-        const deltaKeys = deltaObj && Object.keys(deltaObj);
+    // Create a combined list of keys from the original json and the delta.
+    // These are used to build a list of added, removed and moved (Array) items
+    if (delta) {
 
-        let keys = jsonKeys;
+        //
+        moveDestinations = {};
+        deltaKeys = Object.keys(delta);
 
-        if (deltaKeys) {
+        // Combine and remove duplicates
+        keys = keys.concat(deltaKeys);
+        keys = keys.filter((item, i) => keys.indexOf(item) === i);
 
-            // Combine and remove duplicates
-            keys = jsonKeys.concat(deltaKeys)
-            keys = keys.filter((item, i) => keys.indexOf(item) === i);
+        // https://github.com/benjamine/jsondiffpatch/blob/master/docs/deltas.md#array-with-inner-changes
+        const indexOfT = keys.indexOf("_t");
+        if (indexOfT >= 0) {
 
-            // The delta is for an Array
-            if (keys.indexOf("_t") >= 0) {
-                keys = keys.filter(key => key !== "_t").sort(arrayKeyComparer);
-            } else {
-                keys = keys.sort();
-            }
+            keys.splice(indexOfT, 1);
+
+            // Sort Array indices numerically
+            keys = keys.sort(arrayKeyCompare);
+        } else {
+            // Sort Object keys alphabetically
+            keys = keys.sort();
         }
 
-        // https://github.com/benjamine/jsondiffpatch/blob/master/src/formatters/base.js#L154
-        let moveDestinations = {};
+        // Based on https://github.com/benjamine/jsondiffpatch/blob/master/src/formatters/base.js#L154
+        // Create a mapping to track moved items
+        deltaKeys.forEach(fromIndex => {
 
-        if (deltaKeys) {
+            const deltaValue = delta[fromIndex];
+            const deltaType = getDeltaType(deltaValue, undefined);
 
-            // let hasMoveDestinations = false;
+            if (deltaType == "moved") {
 
-            deltaKeys.forEach(deltaKey => {
-
-                const deltaValue = deltaObj[deltaKey];
-                const deltaType = getDeltaType(deltaValue, undefined);
-
-                if (deltaType == "moved") {
-                    // hasMoveDestinations = true;
-
-                    // Mapped by the to destination
-                    // substr removed the leading _
-                    moveDestinations[deltaValue[1].toString()] = {
-                        desc: `${deltaKey.substr(1)} was moved to ${deltaValue[1].toString()}`,
-                        key: deltaKey,
-                        value: jsonObj[parseInt(deltaKey.substr(1))]
-                    }
+                // Mapped by the to destination, substr removed the leading _
+                moveDestinations[deltaValue[1].toString()] = {
+                    fromIndex,
+                    fromValue: json[parseInt(fromIndex.substr(1))]
                 }
-            });
+            }
+        });
+    }
+
+    //
+    const out = keys.map(key => {
+
+        const movedFrom = moveDestinations && moveDestinations[key];
+
+        let currentValue = json[key];
+        const currentDelta = delta && delta[key];
+        const currentDeltaType = getDeltaType(currentDelta, movedFrom);
+
+        // TODO: Parameterize
+        if (currentDeltaType === "unchanged") {
+            return null;
         }
 
-        return keys && keys.map(key => {
+        if (movedFrom) {
+            currentValue = movedFrom.fromValue;
+            // console.log(`${key} = ${movedFrom.desc}`);
+        } else {
 
-            const movedFrom = moveDestinations && moveDestinations[key];
+        }
 
-            let currentValue = jsonObj[key];
-            const currentDelta = deltaObj && deltaObj[key];
-            const currentDeltaType = getDeltaType(currentDelta, movedFrom);
+        const valueType: any = Array.isArray(currentValue) ? "array" : typeof currentValue;
 
+        // If it's an Array or a Object we need to process it's children
+        // Otherwise we show the delta or the unchanged value
+        const isSimpleValue = ["string", "number", "boolean"].indexOf(valueType) !== -1 || !currentValue;
 
-            if (currentDeltaType === "unchanged") {
-                return null;
-            }
+        let deltaRenderer;
+        if (currentDeltaType === "added") {
+            deltaRenderer = <Added name={key} delta={currentDelta} />
+        }
+        else if (currentDeltaType === "deleted") {
 
-            if (movedFrom) {
-                currentValue = movedFrom.value;
-                console.log(`${key} = ${movedFrom.desc}`);
-            }
+            deltaRenderer = <Removed name={key} delta={currentDelta} />
+        }
+        else if (currentDeltaType === "moved") {
 
-            const valueType: any = Array.isArray(currentValue) ? "array" : typeof currentValue;
+            deltaRenderer = <Moved name={key} delta={currentDelta} />
+        }
+        else if (currentDeltaType === "modified") {
 
-            // If it's an Array or a Object we need to process it's children
-            // Otherwise we show the delta or the unchanged value
-            const isSimpleValue = ["string", "number", "boolean"].indexOf(valueType) !== -1 || !currentValue;
+            deltaRenderer = <Modified name={key} delta={currentDelta} />
+        }
+        else if (currentDeltaType === "textdiff") {
 
-            let deltaRenderer;
-            if (currentDeltaType === "added") {
-                deltaRenderer = <Added name={key} delta={currentDelta} />
-            }
-            else if (currentDeltaType === "deleted") {
+            deltaRenderer = <TextDiff name={key} delta={currentDelta} />
 
-                deltaRenderer = <Removed name={key} delta={currentDelta} />
-            }
-            else if (currentDeltaType === "moved") {
+        }
+        else if (currentDelta === "node") {
+            deltaRenderer = <>
+                <Name>Required Node {key}</Name>
+                <JSONDeltaComponent json={currentValue} delta={currentDelta} />
+            </>
+        }
+        else {
 
-                deltaRenderer = <Moved name={key} delta={currentDelta} />
-            }
-            else if (currentDeltaType === "modified") {
-
-                deltaRenderer = <Modified name={key} delta={currentDelta} />
-            }
-            else if (currentDeltaType === "textdiff") {
-
-                deltaRenderer = <TextDiff id={key} delta={currentDelta} />
-
-            }
-            else if (currentDelta === "node") {
+            if (isSimpleValue) {
+                deltaRenderer = <span>
+                    <Name>{key}</Name>
+                    {`${currentValue}`}
+                </span>;
+            } else {
                 deltaRenderer = <>
-                    <Name>Required Node {key}</Name>
-                    {highlightedJSON(currentValue, currentDelta)}
+                    <Name>{key}</Name>
+                    <JSONDeltaComponent json={currentValue} delta={currentDelta} />
                 </>
             }
-            else {
+        }
 
-                if (isSimpleValue) {
-                    deltaRenderer = <span>
-                        <Name>{key}</Name>
-                        {`${currentValue}`}
-                    </span>;
-                } else {
-                    deltaRenderer = <>
-                        <Name>{key}</Name>
-                        {highlightedJSON(currentValue, currentDelta)}
-                    </>
-                }
-            }
+        return (
+            <div key={key} className="line">
+                {deltaRenderer}
+            </div>
+        );
+    });
 
-            {/*
-            <span className="key">{key} |</span>
-
-            */}
-            return (
-                <div key={key} className="line">
-                    <span><i>{currentDeltaType}</i> |</span>
-                    {deltaRenderer}
-                </div>
-            );
-        })};
-
-    return <div>{highlightedJSON(json, delta)}</div>;
+    return out && <>{out}</>;
 };
 
 const StyledHighlightedJSON = styled.div`
@@ -578,7 +590,7 @@ class ConfigurationAuditView extends React.Component<OwnProps, {}>{
         return (
             <div style={{display: "flex", flex: 1, flexDirection: "row"}}>
                 <pre style={{flex: 1}}>{delta && JSON.stringify(delta, null, 2)}</pre>
-                <StyledHighlightedJSON><HighlightedJSON delta={delta} json={before} /></StyledHighlightedJSON>
+                <StyledHighlightedJSON><JSONDeltaComponent delta={delta} json={before} /></StyledHighlightedJSON>
             </div>
         );
     }
