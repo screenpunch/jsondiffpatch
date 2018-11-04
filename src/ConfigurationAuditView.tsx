@@ -51,9 +51,9 @@ type DeltaRendererProps = {
 // https://javascriptweblog.wordpress.com/2011/08/08/fixing-the-javascript-typeof-operator/
 const toType = (obj: any) => ({}).toString.call(obj).match(/\s([a-zA-Z]+)/)[1].toLowerCase();
 
-const ValueRenderer: React.SFC<{ json: any }> = (props) => {
+const ValueRenderer: React.SFC<{ json: any, style?: {} }> = (props) => {
 
-    const { json } = props;
+    const { json, style } = props;
     const typeOfSource = toType(json);
 
     let result = null;
@@ -67,10 +67,11 @@ const ValueRenderer: React.SFC<{ json: any }> = (props) => {
             const typeOfValue = toType(value);
             const shouldRecurseValue = typeOfValue === "object" || typeOfValue === "array";
 
+            // TODO: We could format & style the <>{value}</> based on it's type
             return (
-                <div key={key} className="line">
+                <div key={key} className="line" style={style}>
                     <Name>{key}</Name>
-                    {shouldRecurseValue ? <ValueRenderer json={value} /> : <>{value}</>}
+                    {shouldRecurseValue ? <ValueRenderer json={value} /> : <>{`${value}`}</>}
                 </div>
             );
         });
@@ -98,10 +99,10 @@ const Added = (props: DeltaRendererProps) => {
 
     json[propertyName] = value;
 
-    return <span style={{display: "block", backgroundColor: "#bbffbb"}}><ValueRenderer json={json} /></span>;
+    return <ValueRenderer style={{backgroundColor: "#bbffbb"}} json={json} />
 }
 
-const Removed = (props: DeltaRendererProps) => {
+const Deleted = (props: DeltaRendererProps) => {
 
     const { delta, propertyName } = props;
     const value = delta && delta[0];
@@ -110,9 +111,8 @@ const Removed = (props: DeltaRendererProps) => {
 
     json[propertyName] = value;
 
-    return <span style={{display: "block", backgroundColor: '#ffbbbb', textDecoration: "line-through"}}><ValueRenderer json={json} /></span>;
+    return <ValueRenderer style={{display: "block", backgroundColor: '#ffbbbb', textDecoration: "line-through"}} json={json} />;
 }
-
 
 const RequiredNode = (props: DeltaRendererProps & { showUnchangedValues: boolean }) => {
 
@@ -131,23 +131,32 @@ const RequiredNode = (props: DeltaRendererProps & { showUnchangedValues: boolean
 }
 
 const Moved = (props: DeltaRendererProps) => {
+
     const { delta, propertyName } = props;
-
-    let value = delta && delta[1];
-
-    // TODO: Simple Recurse without delta checking
-    if (typeof value === "object") {
-        // value = <HighlightedJSON json={value} delta={undefined} />;
-        value = JSON.stringify(value);
-    }
+    const value = delta && delta[1];
 
     return (
-        <>
+        <div className="line">
             <Name>{propertyName}</Name>
             <span style={{backgroundColor: '#ffffbb'}}>
                 => {value}
             </span>
-        </>
+        </div>
+    );
+}
+
+const MoveDestination = (props: DeltaRendererProps) => {
+
+    const { propertyName } = props;
+    // const value = delta && delta[1];
+
+    return (
+        <div className="line">
+            <Name>{propertyName}</Name>
+            <span style={{backgroundColor: '#ffffbb'}}>
+                => Moved
+            </span>
+        </div>
     );
 }
 
@@ -158,44 +167,40 @@ const Modified = (props: DeltaRendererProps) => {
     const leftValue = delta && delta[0];
     const rightValue = delta && delta[1];
 
-    return (<span>
-        <Name>{propertyName}</Name>
-        <span
-            style={{
-                backgroundColor: '#ffbbbb',
-                textDecoration: "line-through"
-            }}
-        >
-            {leftValue}
-        </span>
-        {" "}
-        <span
-            style={{backgroundColor: '#bbffbb'}}
-        >
-            {rightValue}
-        </span>
-    </span>);
+    return (
+        <div className="line">
+            <Name>{propertyName}</Name>
+            <span
+                style={{
+                    backgroundColor: '#ffbbbb',
+                    textDecoration: "line-through"
+                }}
+            >
+                {leftValue}
+            </span>
+            {" "}
+            <span
+                style={{backgroundColor: '#bbffbb'}}
+            >
+                {rightValue}
+            </span>
+        </div>
+    );
 }
 
 const TextDiff = (props: DeltaRendererProps) => {
     const { delta, propertyName } = props;
     let value = delta && delta[0];
 
-    // TODO: Simple Recurse without delta checking
-    if (typeof value === "object") {
-        value = JSON.stringify(value);
-    }
-
     return (
-        <>
+        <div className="line">
             <Name>{propertyName}</Name>
             <span style={{backgroundColor: '#cccccc'}}>
                 {value}
             </span>
-        </>
+        </div>
     );
 }
-
 
 const getDeltaType = (delta: any, movedFrom: any) => {
 
@@ -240,6 +245,7 @@ const JSONDeltaComponent: React.SFC<{ json: object, delta: Delta | undefined, sh
     let keys: string[] = Object.keys(json);
     let deltaKeys: string[];
     let moveDestinations: { [toIndex: string]: { fromIndex: string, fromValue: any }; };
+    let deltaType: string;
 
     // Create a combined list of keys from the original json and the delta.
     // These are used to build a list of added, removed and moved (Array) items
@@ -271,7 +277,7 @@ const JSONDeltaComponent: React.SFC<{ json: object, delta: Delta | undefined, sh
         deltaKeys.forEach(fromIndex => {
 
             const deltaValue = delta[fromIndex];
-            const deltaType = getDeltaType(deltaValue, undefined);
+            deltaType = getDeltaType(deltaValue, undefined);
 
             if (deltaType === "moved") {
 
@@ -285,71 +291,63 @@ const JSONDeltaComponent: React.SFC<{ json: object, delta: Delta | undefined, sh
     }
 
     //
-    const out = keys.map(key => {
+    const renderers = keys.map(key => {
 
         const movedFrom = moveDestinations && moveDestinations[key];
 
-        let currentValue = json[key];
-        const currentDelta = delta && delta[key];
-        const currentDeltaType = getDeltaType(currentDelta, movedFrom);
+        const objectData = movedFrom ? movedFrom.fromValue : json[key];
+        const objectDelta = delta && delta[key];
 
-        if (movedFrom) {
-            currentValue = movedFrom.fromValue;
-        } else {
-            currentValue = json[key];
-        }
+        deltaType = getDeltaType(objectDelta, movedFrom);
 
-        let deltaRenderer;
-        if (currentDeltaType === "added") {
+        const rendererProps = {
+            key,
+            propertyName: key,
+            delta: objectDelta
+        };
 
-            return <Added key={key} propertyName={key} delta={currentDelta} />
-        }
-        else if (currentDeltaType === "deleted") {
+        switch (deltaType) {
+            case "added":
+                return <Added {...rendererProps} />;
 
-            return <Removed key={key} propertyName={key} delta={currentDelta} />
-        }
-        else if (currentDeltaType === "moved") {
+            case "deleted":
+                return <Deleted {...rendererProps} />;
 
-            deltaRenderer = <Moved propertyName={key} delta={currentDelta} />
-        }
-        else if (currentDeltaType === "modified") {
+            case "moved":
+                return <Moved {...rendererProps} />;
 
-            deltaRenderer = <Modified propertyName={key} delta={currentDelta} />
-        }
-        else if (currentDeltaType === "textdiff") {
+            case "modified":
+                return <Modified {...rendererProps} />;
 
-            deltaRenderer = <TextDiff propertyName={key} delta={currentDelta} />
-        }
-        else if (currentDeltaType === "node") {
+            case "textdiff":
+                return <TextDiff {...rendererProps} />;
 
-            return (
-                <RequiredNode
-                    key={key}
-                    propertyName={key}
-                    data={currentValue}
-                    delta={currentDelta}
-                    showUnchangedValues={showUnchangedValues}
-                />
-            );
-        }
-        else if (currentDeltaType === "movedestination") {
-            deltaRenderer = <>
-                <Name>{key}</Name>
-                <i>Moved</i>
-            </>
-        }
-        else if (currentDeltaType === "unchanged") {
-            return showUnchangedValues && <Unchanged key={key} propertyName={key} data={currentValue} />
-        }
+            case "node":
+                return (
+                    <RequiredNode
+                        {...rendererProps}
+                        data={objectData}
+                        showUnchangedValues={showUnchangedValues}
+                    />
+                );
 
-        return deltaRenderer && (
-            <div key={key} className="line">
-                {deltaRenderer}
-            </div>
-        );
+            case "movedestination":
+                return <MoveDestination {...rendererProps} />;
+
+            case "unchanged":
+                return showUnchangedValues && (
+                    <Unchanged
+                        {...rendererProps}
+                        data={objectData}
+                    />
+                );
+
+            default:
+                return null;
+        }
     });
 
-    return out && <>{out}</>;
+    return renderers && <>{renderers}</>;
 };
 
 const StyledHighlightedJSON = styled.div`
@@ -364,28 +362,7 @@ const StyledHighlightedJSON = styled.div`
   
   .line {
     margin-left: 1rem;
-    border: 1px solid blue;
-   
   }
-  /*
-  .key {
-    margin-right: 0.5rem;
-    color: black;
-    font-weight: 600;
-  }
-  .string {
-    color: green;
-  }
-  .number {
-    color: blue;
-  }
-  .boolean {
-    color: purple;
-  }
-  .null {
-    color: red;
-  }
-  */
 `
 
 class ConfigurationAuditView extends React.Component<OwnProps, {}>{
@@ -606,21 +583,6 @@ class ConfigurationAuditView extends React.Component<OwnProps, {}>{
 
         delta = jsondiffpatch.diff(before, after);
 
-        /*
-        const diffLines = diffs && diffs.map((a, i) => {
-                if (a.added) {
-                    return <AddedSpan key={i}>{`+ ${a.value}`}</AddedSpan>;
-                }
-                else if (a.removed) {
-                    return <RemovedSpan key={i}>{`- ${a.value}`}</RemovedSpan>;
-                } else {
-                    return `  ${a.value}`;
-                }
-            }
-        );
-        */
-        // console.log(diffs);
-
         // <pre style={{flexGrow: 1}}>{auditItem && JSON.stringify(auditItem, null, 2)}</pre>
         // <Inner dangerouslySetInnerHTML={{__html: formattedHtml}} />
         // {before && <div style={{flex: 1}}><Recursive delta={delta} source={before}/></div>}
@@ -631,7 +593,7 @@ class ConfigurationAuditView extends React.Component<OwnProps, {}>{
                     <JSONDeltaComponent
                         delta={delta}
                         json={before}
-                        showUnchangedValues={false}
+                        showUnchangedValues={true}
                     />
                 </StyledHighlightedJSON>
             </div>
