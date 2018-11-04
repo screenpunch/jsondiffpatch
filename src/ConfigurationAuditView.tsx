@@ -593,7 +593,7 @@ class ConfigurationAuditView extends React.Component<OwnProps, {}>{
                     <JSONDeltaComponent
                         delta={delta}
                         json={before}
-                        showUnchangedValues={true}
+                        showUnchangedValues={false}
                     />
                 </StyledHighlightedJSON>
             </div>

@@ -16,8 +16,8 @@
       <file leaf-file-name="ConfigurationAuditView.tsx" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/ConfigurationAuditView.tsx">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="337">
-              <caret line="73" column="93" lean-forward="true" selection-start-line="73" selection-start-column="93" selection-end-line="73" selection-end-column="93" />
+            <state relative-caret-position="254">
+              <caret line="595" column="51" lean-forward="true" selection-start-line="595" selection-start-column="51" selection-end-line="595" selection-end-column="51" />
               <folding>
                 <element signature="e#0#54#0" expanded="true" />
                 <element signature="n#style#0;n#pre#0;n#!!top" expanded="true" />
@@ -186,12 +186,12 @@
       <option name="presentableId" value="Default" />
       <updated>1541256037113</updated>
       <workItem from="1541256038701" duration="7296000" />
-      <workItem from="1541334726572" duration="10966000" />
+      <workItem from="1541334726572" duration="11264000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="18262000" />
+    <option name="totallyTimeSpent" value="18560000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="0" y="23" width="1920" height="973" extended-state="0" />
@@ -212,9 +212,9 @@
       <window_info id="Capture Tool" order="2" />
       <window_info anchor="bottom" id="TypeScript" order="7" />
       <window_info id="Designer" order="2" />
-      <window_info content_ui="combo" id="Project" order="0" sideWeight="0.49744463" visible="true" weight="0.24973376" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" sideWeight="0.49744463" visible="true" weight="0.24973376" />
       <window_info anchor="right" id="Database" order="3" />
-      <window_info active="true" anchor="bottom" id="Find" order="1" visible="true" weight="0.32990867" />
+      <window_info anchor="bottom" id="Find" order="1" visible="true" weight="0.32990867" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
       <window_info id="UI Designer" order="2" />
@@ -265,8 +265,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/ConfigurationAuditView.tsx">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="337">
-          <caret line="73" column="93" lean-forward="true" selection-start-line="73" selection-start-column="93" selection-end-line="73" selection-end-column="93" />
+        <state relative-caret-position="254">
+          <caret line="595" column="51" lean-forward="true" selection-start-line="595" selection-start-column="51" selection-end-line="595" selection-end-column="51" />
           <folding>
             <element signature="e#0#54#0" expanded="true" />
             <element signature="n#style#0;n#pre#0;n#!!top" expanded="true" />
